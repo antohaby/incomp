@@ -1,13 +1,15 @@
 package prj.incomp
 
-import org.mapdb.DBMaker
-import prj.incomp.common.CompilationResult
 import prj.incomp.java.*
-import java.io.File
+import prj.incomp.java.abi.*
+import prj.incomp.persistency.ClassMapFile
+import prj.incomp.persistency.SourceHashesFile
+import java.nio.file.FileSystems
+import java.nio.file.Files
 import javax.tools.ToolProvider
 import kotlin.system.exitProcess
 import kotlin.time.ExperimentalTime
-import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 
 @ExperimentalTime
 fun main(args: Array<String>) {
@@ -16,47 +18,38 @@ fun main(args: Array<String>) {
         exitProcess(1)
     }
 
-    val sourceDir = File(args[0])
-    val targetDir = File(args[1])
+    val fs = FileSystems.getDefault()
+    val sourceDir = fs.getPath(args[0])
+    val targetPath = fs.getPath(args[1])
+    val classPath = args[2]
 
-    if (!targetDir.exists()) {
-        targetDir.mkdir()
+    if (!Files.exists(targetPath)) {
+        Files.createDirectories(targetPath)
     }
 
-    val context = JavaCompilationContext(
-        currentTime = System.currentTimeMillis(),
-        sourceSet = JavaFsSourceSet(sourceDir.path),
-        targetLocation = targetDir.toPath(),
-        classPath = args.getOrElse(2) { "" }
+    val request = CompilationRequest(
+        sourceSet = PathSourceSet(sourceDir),
+        classpath = JavaClasspath.parse(classPath, fs),
+        destination = targetPath,
     )
 
-    val db = DBMaker
-        .fileDB(targetDir.resolve("meta.db").path)
-        .transactionEnable()
-        .make()
-
-    val pipeline = javaIncrementalCompilationPipeline(
-        db = db,
-        compiler = ToolProvider.getSystemJavaCompiler()
+    val sourceHashesFile = SourceHashesFile(targetPath.resolve("source-hashes.txt"))
+    val classMapFile =  ClassMapFile(targetPath.resolve("class-map.txt"))
+    val compiler = IncrementalCompilation(
+        fileChangesTracker = FileChangesTracker(sourceHashesFile),
+        abiProvider = AsmAbiProvider,
+        abiCompatibility = java8SpecIncompatibilityChecker(),
+        classMapStore = classMapFile,
+        compiler = JdkCompiler(ToolProvider.getSystemJavaCompiler())
     )
 
-    var total = 0
-    val duration = measureTime {
-        val compilationResults = pipeline.compile(context)
-        for ((unit, result) in compilationResults) {
-            total++
-            print("${unit.pathInSourceSet}: ")
-            when (result) {
-                is CompilationResult.Success -> println("OK")
-                is CompilationResult.Failed -> {
-                    println("Failed")
-                    result.errors.forEach(::println)
-                }
-            }
-        }
+
+    val (result, duration) = measureTimedValue { compiler.runCompilation(request) }
+
+    if (result.isSuccessful) {
+        println("Compiled Files: ${result.compiledClasses.keys}")
+        println("Total ${result.compiledClasses.size} files in $duration")
+    } else {
+        println("Compilation failed in $duration")
     }
-
-    db.commit()
-    db.close()
-    println("Compiled $total files in: $duration")
 }

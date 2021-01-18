@@ -6,17 +6,20 @@ plugins {
 }
 
 group = "me.alakotka"
-version = "1.0-SNAPSHOT"
+version = "1.1-SNAPSHOT"
 
 repositories {
     mavenCentral()
 }
 
 dependencies {
-    implementation("com.github.javaparser:javaparser-symbol-solver-core:3.18.0")
-    implementation("org.mapdb:mapdb:3.0.8")
+    implementation("org.ow2.asm:asm:9.0")
+    // implementation("com.github.javaparser:javaparser-symbol-solver-core:3.18.0")
+
     testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
+    testImplementation("com.google.jimfs:jimfs:1.2")
+    testImplementation("io.mockk:mockk:1.10.4")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
 }
 
@@ -25,7 +28,7 @@ tasks.test {
 }
 
 tasks.withType<KotlinCompile>() {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "11"
 }
 
 application {
