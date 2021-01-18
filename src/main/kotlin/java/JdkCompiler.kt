@@ -29,9 +29,6 @@ class JdkCompiler(
             // "-verbose"
         )
 
-        println("Files to compile: ")
-        println(request.sourceSet.listFiles().map { it.relativePath })
-
         val fs = compiler.getStandardFileManager(null, null, null)
         val javaFiles = request
             .sourceSet
