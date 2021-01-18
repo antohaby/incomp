@@ -10,4 +10,4 @@ Usage:
 
 Or use ``./gradlew run --args"...""``
 
-Example: ``./build/install/incomp/bin/incomp test-project/src/ test-project/build/ test-project/libs/*``
+Example: ``./build/install/incomp/bin/incomp test-project/src/ test-project/build/ test-project/libs/mapdb-3.0.8.jar``
