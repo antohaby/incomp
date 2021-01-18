@@ -2,7 +2,6 @@ package prj.incomp.java
 
 import prj.incomp.java.abi.*
 import prj.incomp.persistency.ClassMapFile
-import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -78,15 +77,22 @@ class IncrementalCompilation(
 
     private fun withChangedFiles(
         sourceSet: JavaSourceSet,
-        code: (ChangedSourceSet) -> CompilationResult
+        compile: (ChangedSourceSet) -> CompilationResult
     ): CompilationResult {
         val changedFilesTx = fileChangesTracker.begin(sourceSet)
 
         val changedSourceFiles = changedFilesTx.listChangedFiles()
         return try {
-            code(changedSourceFiles).also { changedFilesTx.commit() }
-        } finally {
+            compile(changedSourceFiles).also { result ->
+                if (result.isSuccessful) {
+                    changedFilesTx.commit()
+                } else {
+                    changedFilesTx.rollback()
+                }
+            }
+        } catch (e: Exception) {
             changedFilesTx.rollback()
+            throw e
         }
     }
 
